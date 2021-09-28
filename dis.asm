@@ -20,7 +20,9 @@
 ;
 ;=====================================================
 ; Addressing mode constants.  If this gets changed,
-; then addmodeLen must be adjusted too.
+; then addmodeLen must be adjusted too.  Sorry for the
+; awful names, I just wanted them all to be the same
+; length.
 ;
 AM_BADD		equ	0	;illegal instruction
 AM_ACCU		equ	1	;Accumulator
@@ -38,6 +40,17 @@ AM_ZIWY		equ	12	;Zero Page Indexed with Y: zp,Y
 AM_ZPIN		equ	13	;Zero Page Indirect: (zp)
 AM_IIWY		equ	14	;Zero Page Indexed Indirect with Y: (zp),Y
 AM_AIIX		equ	15	;Absolute Indexed Indirect with X: (addr,X)
+;
+;=====================================================
+; Disassembles one instruction pointed to by PCL.
+; Returns C set if an illegal instruction, otherwise
+; returns C clear and A contains the number of bytes
+; in the instruction.
+;
+doDisPC		lda	PCL
+		sta	POINTL
+		lda	PCH
+		sta	POINTH
 ;
 ;=====================================================
 ; Disassembles one instruction pointed to by POINT.
@@ -151,21 +164,6 @@ disargs		lda	addmode
 		lda	disaddjump+1,x
 		sta	Temp16+1
 		jmp	(Temp16)	;go to handler
-
-
-
-
-
-	jsr CRLF
-;
-; Finish up by loading the instruction length into A
-; and clearning carry.
-;
-		ldx	addmode
-		lda	addmodeLen,x	;get length
-		clc
-		rts
-
 ;
 ;=====================================================
 ; Using the addressing mode as an offset, this table
@@ -212,7 +210,6 @@ disspacer2	stx	storeX
 ; Finish up by loading the instruction length into A
 ; and clearning carry.
 ;
- jsr CRLF ;very temporary
 		ldx	addmode
 		lda	addmodeLen,x	;get length
 		clc
@@ -221,7 +218,7 @@ disspacer2	stx	storeX
 ;=====================================================
 ; This handles the ACCUMULATOR mode by outputting an A.
 
-dishanA		lda	'A'
+dishanA		lda	#'A'
 		jsr	xkOUTCH
 		lda	#1
 		jmp	disspacer
@@ -292,24 +289,15 @@ dishanpos	clc
 ;=====================================================
 ; Handles zero page
 ;
-dishanZero	ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
+dishanZero	jsr	disprZaddr
 		lda	#2
 		jmp	disspacer
 ;
 ;=====================================================
 ; Indirect.  Just like absolute except address is in
-; parens.
+; parens.  (addr)
 ;
-dishanInd	lda	#'('
-		jsr	xkOUTCH
-		ldy	#2
-		lda	(POINTL),y
-		jsr	PRTBYT
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
+dishanInd	jsr	disprpaddr
 		lda	#')'
 		jsr	xkOUTCH
 		lda	#6
@@ -318,43 +306,25 @@ dishanInd	lda	#'('
 ;=====================================================
 ; addr,X
 ;
-dishanAIWX	ldy	#2
-		lda	(POINTL),y
-		jsr	PRTBYT
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
-		lda	#','
-		jsr	xkOUTCH
-		lda	#'X'
-		jsr	xkOUTCH
+dishanAIWX	jsr	dispraddr
+		jsr	putsil
+		db	",X",0
 		lda	#6
 		jmp	disspacer
 ;
 ;=====================================================
 ; addr,Y
 ;
-dishanAIWY	ldy	#2
-		lda	(POINTL),y
-		jsr	PRTBYT
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
-		lda	#','
-		jsr	xkOUTCH
-		lda	#'Y'
-		jsr	xkOUTCH
+dishanAIWY	jsr	dispraddr
+		jsr	putsil
+		db	",Y",0
 		lda	#6
 		jmp	disspacer
 ;
 ;=====================================================
 ; (zp,X)
 ;
-dishanZIIX	lda	#'('
-		jsr	xkOUTCH
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
+dishanZIIX	jsr	disprpZaddr
 		jsr	putsil
 		db	",X)",0
 		lda	#6
@@ -363,38 +333,26 @@ dishanZIIX	lda	#'('
 ;=====================================================
 ; zp,X
 ;
-dishanZIWX	ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
-		lda	#','
-		jsr	xkOUTCH
-		lda	#'X'
-		jsr	xkOUTCH
+dishanZIWX	jsr	disprZaddr
+		jsr	putsil
+		db	",X",0
 		lda	#4
 		jmp	disspacer
 ;
 ;=====================================================
 ; zp,Y
 ;
-dishanZIWY	ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
-		lda	#','
-		jsr	xkOUTCH
-		lda	#'Y'
-		jsr	xkOUTCH
+dishanZIWY	jsr	disprZaddr
+		jsr	putsil
+		db	",Y",0
 		lda	#4
 		jmp	disspacer
 ;
 ;=====================================================
 ; (zp)
 ;
-dishanZPIN	lda	#'('
-		jsr	xkOUTCH
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
-		lda	#'('
+dishanZPIN	jsr	disprpZaddr
+		lda	#')'
 		jsr	xkOUTCH
 		lda	#4
 		jmp	disspacer
@@ -402,11 +360,7 @@ dishanZPIN	lda	#'('
 ;=====================================================
 ; (zp),Y
 ;
-dishanIIWY	lda	#'('
-		jsr	xkOUTCH
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
+dishanIIWY	jsr	disprpZaddr
 		jsr	putsil
 		db	"),Y",0
 		lda	#6
@@ -415,18 +369,42 @@ dishanIIWY	lda	#'('
 ;=====================================================
 ; (ADDR,x)
 ;
-dishanAIIX	lda	#'('
-		jsr	xkOUTCH
-		ldy	#2
-		lda	(POINTL),y
-		jsr	PRTBYT
-		ldy	#1
-		lda	(POINTL),y
-		jsr	PRTBYT
+dishanAIIX	jsr	disprpaddr
 		jsr	putsil
 		db	",X)",0
 		lda	#8
 		jmp	disspacer
+;
+;=====================================================
+; This prints a "(" followed by the 16 bit address
+; after the opcode.
+;
+disprpaddr	lda	#'('
+		jsr	xkOUTCH
+;
+;=====================================================
+; This prints the two bytes following the opcode.
+;
+dispraddr	ldy	#2
+		lda	(POINTL),y
+		jsr	PRTBYT
+		ldy	#1
+		lda	(POINTL),y
+		jmp	PRTBYT
+;
+;=====================================================
+; This prints a "(" followed by the 8 bit address
+; after the opcode.
+;
+disprpZaddr	lda	#'('
+		jsr	xkOUTCH
+;
+;=====================================================
+; This prints the byte following the opcode.
+;
+disprZaddr	ldy	#1
+		lda	(POINTL),y
+		jmp	PRTBYT
 ;
 ;=====================================================
 ; This takes the bottom five bits of Temp16, adds
@@ -540,19 +518,13 @@ addmodeTbl	db	AM_IMPL, AM_ZIIX, AM_BADD, AM_BADD	;00-03
 		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ZERO	;D4-D7
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_BADD	;D8-DB
 		db	AM_BADD, AM_AIWX, AM_AIWX, AM_RELA	;DC-DF
-
-MOFF		macro	label
-		db	label-MNENS
-		endm
-
 ;
 ;=====================================================
 ; Using the opcode as an index, this returns the
 ; offset into the mnemonic table to get the 16 bit
 ; compressed mnemonic.
 ;
-mnemoniclookup
-		db	MNEM_BRK&$ff, MNEM_ORA&$ff	;00-0F
+mnemoniclookup	db	MNEM_BRK&$ff, MNEM_ORA&$ff	;00-0F
 		db	MNEM_BAD&$ff, MNEM_BAD&$ff
 		db	MNEM_TSB&$ff, MNEM_ORA&$ff
 		db	MNEM_ASL&$ff, MNEM_RMB&$ff
@@ -720,6 +692,11 @@ mnemoniclookup
 ; No, I did not do these all by hand.  10 minutes of C
 ; coding produced a program which took a list of the
 ; mnemonics and cranked out all the DW lines.
+;
+; I was lazy and the contents of mnemoniclookup
+; assume this table starts on a page boundary.  If
+; this bothers you, then fix all the entries in
+; mnemoniclookup.
 ;
 		org	(*+$ff)&$ff00	;page boundary
 MNENS		equ	*
