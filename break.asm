@@ -8,7 +8,7 @@
 ;
 ; Max number of active breakpoints...
 ;
-NUM_BREAKPOINTS	equ	5
+USER_BREAKPTS	equ	5
 ;
 ; 6502 BRK instruction
 ;
@@ -164,6 +164,8 @@ breakset2	lda	#$ff
 		sta	breakpoints+1,y
 		lda	Temp16+1	;MSB
 		sta	breakpoints+2,y
+		lda	#$ff
+		sta	BreakptEnable
 		jmp	MainLoop
 ;
 ;=====================================================
@@ -218,6 +220,8 @@ ClearBreakpoint	ldx	#breakptend-breakpoints-1
 breakclear2	sta	breakpoints,x
 		dex
 		bpl	breakclear2
+		lda	#0		;disable breakpoints
+		sta	BreakptEnable
 		rts
 ;
 ;=====================================================
@@ -284,8 +288,10 @@ breakrem2	inx
 ;    * Address
 ;    * Original instruction at that address
 ;
-breakpoints	ds	4*NUM_BREAKPOINTS
+breakpoints	ds	4*USER_BREAKPTS
 breakptend	equ	*
+;
+; Set if breakpoints are enabled.
 ;
 BreakptEnable	ds	1
 
