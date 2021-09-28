@@ -14,7 +14,7 @@
 //    'D' - '?' = $05 = 00101
 //    'A' - '?' = $02 = 00010
 //
-// So the 16 bit value is: 00010 00101 01101 or $08AD
+// Resulting in the 16 bit value of 00010 00101 01101 or $08AD
 //
 // 09/24/2021 - Bob Applegate, bob@corshamtech.com
 
@@ -59,6 +59,9 @@ int main(int argc, char **argv)
 			result = (buffer[2] - '?') << 10;
 			result |= (buffer[1] - '?') << 5;
 			result |= buffer[0] - '?';
+
+			// Output a line that the assembler can directly
+			// work with.  Ie, copy/paste each line.
 
 			printf("MNEM_%s\tdw\t$%04x\n", buffer, result);
 		}
