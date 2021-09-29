@@ -19,7 +19,7 @@
 ;    Hex dump of area of memory
 ;
 ; Addresses and values can be zero or more hex digits
-; in length. 0 = $0000, etc.
+; in length. 0 = $0000, 12345678 = $5678, etc.
 ;
 ; Commands are entered, return pressed, then commands
 ; are interpreted.  Error messages aren't necessarily
@@ -44,14 +44,14 @@
 ; L = Load Intel hex file from console.
 ; R = Displays all registers.
 ; R <reg> <value> = Set register to value.
+; S = Single step current instruction at PC.
+; SO = Step over next instruction if it is a JSR.
 ;
 ; PARTIALLY DONE
 ; ==============
 ;
 ; NOT STARTED
 ; ===========
-; S = Single step current instruction at PC.
-; SO = Step over next instruction if it is a JSR.
 ; 
 ; Consider buying a KIM-1 expansion board or a KIM
 ; Clone from us:
@@ -102,7 +102,7 @@ Debugger	jmp	COLD
 ;
 COLD		jsr	putsil
 		db	CR,LF,LF
-		db	"Corsham Tech 6502 Debugger v0.0"
+		db	"Corsham Tech 65C02 xDebugger v0.1"
 		db	CR,LF
 		db	"Running at address ",0
 		lda	#Debugger>>8
@@ -125,7 +125,9 @@ COLD		jsr	putsil
 		jsr	InstallVecs	;install handlers
 		jsr	BreakInit	;initialize breakpoints
 ;
-; Main loop.  Present a prompt, get command, process it
+; Main loop.  Present a prompt, get command, process it.
+; All command handlers should eventually JMP back to here,
+; as this also resets the stack pointer.
 ;
 MainLoop	ldx	initialSP
 		txs			;make stack sane
@@ -168,11 +170,35 @@ cmdfound	lda	Commands+1,x	;LSB of handler
 cmdnotfound	pla			;clean stack
 		jsr	putsil
 		db	"Huh?",CR,LF,0
-		jmp	vecHelp
+vecHelp		jsr	putsil
+		db	CR,LF
+		db	"? = This list",CR,LF
+		db	"B = List breakpoints",CR,LF
+		db	"BD = Disable breakpoints",CR,LF
+		db	"BE = Enable breakpoints",CR,LF
+		db	"BC [<addr>] = Clear one or all breakpoints",CR,LF
+		db	"BS <addr> = Sets breakpoint at address",CR,LF
+		db	"C = Continue from last breakpoint",CR,LF
+		db	"D = Disassemble at PC",CR,LF
+		db	"E <addr> = Edit memory at address",CR,LF
+		db	"D <addr> = Disassemble one instruction",CR,LF
+		db	"D <addr> <addr> = Disassemble range",CR,LF
+		db	"H <addr> <addr> = Do hex dump",CR,LF
+		db	"J <addr> = Jump to address",CR,LF
+		db	"K = Directory of SD card",CR,LF
+		db	"L = Load hex file from console",CR,LF
+		db	"L <filename> = Load hex file from SD card",CR,LF
+		db	"R [<name> <value>] = Registers",CR,LF
+		db	"S = Step one instruction",CR,LF
+		db	"SO = Step over JSR",CR,LF
+		db	"Q = Quit back to xKIM",CR,LF
+		db	0
+		jmp	MainLoop
 ;
 ; Vectors to command handlers.  Each entry has a one byte
 ; ASCII character followed by a pointer to the handler for
 ; that command.  Most handlers end with a JMP MainLoop.
+; The end of the table is marked with a 00 byte.
 ;
 Commands	db	'?'
 		dw	vecHelp
@@ -201,32 +227,6 @@ Commands	db	'?'
 		db	0		;MUST BE LAST!
 ;
 ;=====================================================
-; Provides a bit of help.
-;
-vecHelp		jsr	putsil
-		db	CR,LF
-		db	"? = This list",CR,LF
-		db	"B = List breakpoints",CR,LF
-		db	"BD = Disable breakpoints",CR,LF
-		db	"BE = Enable breakpoints",CR,LF
-		db	"BC [<addr>] = Clear one or all breakpoints",CR,LF
-		db	"BS <addr> = Sets breakpoint at address",CR,LF
-		db	"C = Continue from last breakpoint",CR,LF
-		db	"D = Disassembled at PC",CR,LF
-		db	"D <addr> = Disassemble one instruction",CR,LF
-		db	"D <addr> <addr> = Disassemble range",CR,LF
-		db	"H <addr> <addr> = Do hex dump",CR,LF
-		db	"J <addr> = Jump to address",CR,LF
-		db	"K = Directory of SD card",CR,LF
-		db	"L = Load hex file from console",CR,LF
-		db	"L <filename> = Load hex file from SD card",CR,LF
-		db	"R [<name> <value>] = Registers",CR,LF
-		db	"S = Step one instruction",CR,LF
-		db	"Q = Quit back to xKIM",CR,LF
-		db	0
-		jmp	MainLoop
-;
-;=====================================================
 ; Exit the debugger.
 ;
 ExitDbg		jsr	RestoreVecs	;undo our handlers
@@ -236,13 +236,36 @@ ExitDbg		jsr	RestoreVecs	;undo our handlers
 ;
 ;=====================================================
 ; Jump to addresss which is on the command line.  It
-; jumps to the specified address with undefined
-; register values.  Breakpoints are active.
+; jumps to the specified address with the last register
+; values.  Breakpoints are active.
 ;
 Jump		jsr	ChkParam	;check for param
 		jsr	GetHex
-		jsr	BreakInstall	;enable breakpoints
-		jmp	(Temp16)
+		lda	Temp16
+		sta	PCL
+		lda	Temp16+1
+		sta	PCH
+;
+; Fall through...
+;
+;=====================================================
+; This continues execution by loading all the register
+; values saved duringh the interrupt and jumping back
+; into the code.  Continue will install breakpoints,
+; while ContinueNoBrk will not install them.  This is
+; used for single-stepping where breakpoints are not
+; needed and get into the way.
+;
+Continue	jsr	BreakInstall	;enable breakpoints
+ContinueNoBrk	ldx	SPUSER
+		txs
+		lda	PREG		;flags
+		pha			;to be restored later
+		lda	ACC
+		ldx	XREG
+		ldy	YREG
+		plp			;restore flags
+		jmp	(PCL)		;return!
 ;
 ;=====================================================
 ; Does a disassembly of a piece of code.  If no params
@@ -343,14 +366,15 @@ LoadHex		jsr	SkipSpaces
 		jsr	loadHexFile	;in xKIM
 ;
 ; We do not want to auto-run, but if the address was
-; set, display it.
+; set, display it and set the PC value to it.  Allows
+; the user to immediate Step the code.
 ;
 loadcheckauto	lda	AutoRun+1
 		cmp	#$ff
 		beq	loadhexit	;not set
 ;
 		jsr	putsil
-		db	"Auto-run address set to ",0
+		db	"Auto-run address and PC set to ",0
 		lda	AutoRun+1
 		sta	PCH
 		jsr	PRTBYT
@@ -362,7 +386,7 @@ loadhexit	jmp	CRLF
 ;
 ; Load from the console
 ;
-loadconsole	jsr	loadHexFile
+loadconsole	jsr	loadHexConsole
 		jmp	loadcheckauto
 ;
 ;=====================================================
@@ -482,21 +506,6 @@ HexDigits	db	"0123456789ABCDEF"
 HexDigEnd	equ	*
 ;
 ;=====================================================
-; This continues execution by loading all the register
-; values saved duringh the interrupt and jumping back
-; into the code.
-;
-Continue	ldx	SPUSER
-		txs
-		lda	PREG		;flags
-		pha			;to be restored later
-		lda	ACC
-		ldx	XREG
-		ldy	YREG
-		plp			;restore flags
-		jmp	(PCL)		;return!
-;
-;=====================================================
 ; Steps one instruction.  Note that this fails if the
 ; instruction is followed by data rather than another
 ; instruction, such as "jsr putsil" which is followed
@@ -516,13 +525,20 @@ Continue	ldx	SPUSER
 ;     instruction after the current one.
 ;
 Step		ldy	#0
-		lda	(PCL),y		;get opcode
+		sty	ID		;assume not step-ver
+		ldx	cmdOffset
+		lda	buffer,x
+		beq	stepnoto
+		cmp	#'O'		;Over?
+		bne	stepnoto
+		inc	ID		;do step-over
+stepnoto	lda	(PCL),y		;get opcode
 		tax			;just in case
 ;
 ; See if it is a JMP or JSR.
 ;
 		cmp	#$20		;JSR abs
-		beq	stepJMP
+		beq	stepJSR
 		cmp	#$4c		;JMP abs
 		beq	stepJMP
 		cmp	#$6c		;JMP (indirect)
@@ -575,6 +591,14 @@ stepindir1	lda	(INL),y		;LSB
 		sta	INL
 		jmp	stepJMP2
 ;
+; It's a JSR.  If they want to step over, then set
+; the breakpoint at the next address and not inside
+; the subroutine.
+;
+stepJSR		lda	ID
+		beq	stepJMP		;step in
+		jmp	stepnobranch	;else skip
+;
 ; The next two bytes contain the address of the next
 ; instruction, so put the BRK there.
 ;
@@ -600,7 +624,7 @@ stepJMP2	ldy	#0
 		sta	StepAddress
 		lda	INH
 		sta	StepAddress+1
-		jmp	Continue	;go!
+		jmp	ContinueNoBrk	;go!
 ;
 ;-----------------------------------------------------
 ; Now it gets complicated.  If this is a branch
@@ -716,7 +740,7 @@ stepnobranch	lda	addmodeTbl,x	;get addr mode
 		sta	StepActive	;step is active
 		lda	#BRK
 		sta	(INL),y		;set breakpoint
-		jmp	Continue	;go!
+		jmp	ContinueNoBrk	;go!
 ;
 ;=====================================================
 ; Dislays or modifies register values

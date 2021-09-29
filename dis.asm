@@ -132,6 +132,7 @@ dodissem4	jsr	space2
 ;
 ; The WDC65C02 has four instructions that have a bit
 ; number appended to the opcode: RMB, SMB, BBR and BBS.
+; The number is in bits 4-6.
 ;
 		lda	opcode
 		and	#$0f
@@ -147,6 +148,7 @@ disweird	lda	opcode
 		lsr	a
 		lsr	a
 		lsr	a
+		and	#$07
 		ora	#'0'
 		jsr	xkOUTCH
 		jsr	space
