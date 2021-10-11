@@ -2,7 +2,6 @@
 ; dis.asm
 ;
 ; This is the disassembler for the debugger.
-
 ;
 ; This is coded to support the WDC 65C02 chip.  In the
 ; future I might have a 6502 mode.
@@ -40,6 +39,13 @@ AM_ZIWY		equ	12	;Zero Page Indexed with Y: zp,Y
 AM_ZPIN		equ	13	;Zero Page Indirect: (zp)
 AM_IIWY		equ	14	;Zero Page Indexed Indirect with Y: (zp),Y
 AM_AIIX		equ	15	;Absolute Indexed Indirect with X: (addr,X)
+;
+; These are only used by the assembler for the BBR, BBS,
+; RMB and SMB mnemonics which have a number at the end
+; of the mnemonic to determine the instruction.
+;
+AM_ODD3		equ	16	;BBRx, BBSx - 3 bytes
+AM_ODD2		equ	17	;RMBx, SMBx - 2 bytes
 ;
 ;=====================================================
 ; Disassembles one instruction pointed to by PCL.
@@ -152,7 +158,17 @@ disweird	lda	opcode
 		ora	#'0'
 		jsr	xkOUTCH
 		jsr	space
+;
+; Special case processing for BBS and BBR, otherwise
+; it's pretty normal from here.
+;
+		lda	opcode
+		and	#$08
+		bcc	disargs	;not too weird
+		lda	#AM_ODD3
+		sta	addmode
 		jmp	disargs
+;
 disnormal	jsr	space2
 ;
 ; The opcode has been printed, so now it's time to print
@@ -187,6 +203,8 @@ disaddjump	dw	dishanImp
 		dw	dishanZPIN
 		dw	dishanIIWY
 		dw	dishanAIIX
+		dw	dishanODD3
+		dw	dishanODD2
 ;
 ;=====================================================
 ; Handler for implied and bad modes.  There are no
@@ -287,6 +305,54 @@ dishanpos	clc
 ;
 		lda	#4
 		jmp	disspacer
+;
+;=====================================================
+; BBSx or BBRx.  The third byte of the instruction
+; has an 8 bit signed offset from the byte following
+; the instruction.  So get the current instruction's
+; address, add three, then add in the offset.
+;
+dishanODD3	lda	POINTL		;move to Temp16
+		sta	Temp16
+		lda	POINTH
+		sta	Temp16+1
+;
+		clc
+		lda	#3		;now add three
+		adc	Temp16
+		sta	Temp16
+		bcc	dishanODD1
+		inc	Temp16+1
+;
+dishanODD1	ldy	#1		;get address
+		lda	(POINTL),y
+		jsr	PRTBYT
+		lda	#','
+		jsr	xkOUTCH
+;
+		ldy	#2		;now add in offset
+		lda	#0
+		sta	storeX		;for sign extension
+		lda	(POINTL),y
+		bpl	dishanODDpos	;branch if positive
+		dec	storeX		;make ext negative
+dishanODDpos	clc
+		adc	Temp16
+		sta	Temp16
+
+		lda	storeX
+		adc	Temp16+1
+		sta	Temp16+1
+;
+		lda	Temp16+1
+		jsr	PRTBYT
+		lda	Temp16
+		jsr	PRTBYT
+;
+		lda	#7
+		jmp	disspacer
+;
+dishanODD2
 ;
 ;=====================================================
 ; Handles zero page
@@ -434,7 +500,7 @@ disshift6	lsr	Temp16+1
 ;
 addmodeLen	db	1,1,2,1,3,2,2,3
 		db	3,3,2,2,2,2,2,3
-
+		db	3,2			;ODD3 ODD2
 ;
 ;=====================================================
 ; This table uses the opcode as an index to get the
@@ -442,84 +508,84 @@ addmodeLen	db	1,1,2,1,3,2,2,3
 ; of bytes.
 ;
 addmodeTbl	db	AM_IMPL, AM_ZIIX, AM_BADD, AM_BADD	;00-03
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;04-07
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;04-07
 		db	AM_IMPL, AM_IMME, AM_ACCU, AM_BADD	;08-0B
-		db	AM_ACCU, AM_ACCU, AM_ACCU, AM_RELA	;0C-0F
+		db	AM_ACCU, AM_ACCU, AM_ACCU, AM_ODD3	;0C-0F
 ;
 		db	AM_RELA, AM_IIWY, AM_ZERO, AM_BADD	;10-13
-		db	AM_ZERO, AM_ZIWX, AM_ZIWX, AM_ZERO	;14-17
+		db	AM_ZERO, AM_ZIWX, AM_ZIWX, AM_ODD2	;14-17
 		db	AM_IMPL, AM_AIWY, AM_ACCU, AM_BADD	;18-1B
-		db	AM_ACCU, AM_AIWX, AM_AIWX, AM_RELA	;1C-1F
+		db	AM_ACCU, AM_AIWX, AM_AIWX, AM_ODD3	;1C-1F
 ;
 		db	AM_ABSO, AM_ZIIX, AM_BADD, AM_BADD	;20-23
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;24-27
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;24-27
 		db	AM_IMPL, AM_IMME, AM_ACCU, AM_BADD	;28-2B
-		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_RELA	;2C-2F
+		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ODD3	;2C-2F
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;30-33
-		db	AM_ZIWX, AM_ZIWX, AM_ZIWX, AM_ZERO	;34-37
+		db	AM_ZIWX, AM_ZIWX, AM_ZIWX, AM_ODD2	;34-37
 		db	AM_IMPL, AM_AIWY, AM_ACCU, AM_BADD	;38-3B
-		db	AM_AIWX, AM_AIWX, AM_AIWX, AM_RELA	;3C-3F
+		db	AM_AIWX, AM_AIWX, AM_AIWX, AM_ODD3	;3C-3F
 ;
 		db	AM_IMPL, AM_ZIIX, AM_BADD, AM_BADD	;40-43
-		db	AM_BADD, AM_ZERO, AM_ZERO, AM_ZERO	;44-47
+		db	AM_BADD, AM_ZERO, AM_ZERO, AM_ODD2	;44-47
 		db	AM_IMPL, AM_IMME, AM_ACCU, AM_BADD	;48-4B
-		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_RELA	;4C-4F
+		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ODD3	;4C-4F
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;50-53
-		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ZERO	;54-57
+		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ODD2	;54-57
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_BADD	;58-5B
-		db	AM_BADD, AM_AIWX, AM_AIWX, AM_RELA	;5C-5F
+		db	AM_BADD, AM_AIWX, AM_AIWX, AM_ODD3	;5C-5F
 ;
 		db	AM_IMPL, AM_ZIIX, AM_BADD, AM_BADD	;60-63
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;64-67
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;64-67
 		db	AM_IMPL, AM_IMME, AM_ACCU, AM_BADD	;68-6B
-		db	AM_INDI, AM_ACCU, AM_ACCU, AM_RELA	;6C-6F
+		db	AM_INDI, AM_ACCU, AM_ACCU, AM_ODD3	;6C-6F
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;70-73
-		db	AM_ZIWX, AM_ZIWX, AM_ZIWX, AM_ZERO	;74-77
+		db	AM_ZIWX, AM_ZIWX, AM_ZIWX, AM_ODD2	;74-77
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_BADD	;78-7B
-		db	AM_AIIX, AM_AIWX, AM_AIWX, AM_RELA	;7C-7F
+		db	AM_AIIX, AM_AIWX, AM_AIWX, AM_ODD3	;7C-7F
 ;
 		db	AM_RELA, AM_ZIIX, AM_BADD, AM_BADD	;80-83
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;84-87
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;84-87
 		db	AM_IMPL, AM_IMME, AM_IMPL, AM_BADD	;88-8B
-		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ABSO	;8C-8F
+		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ODD3	;8C-8F
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;90-93
-		db	AM_ZIWX, AM_ZIWX, AM_ZIWY, AM_ZERO	;94-97
+		db	AM_ZIWX, AM_ZIWX, AM_ZIWY, AM_ODD2	;94-97
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_BADD	;98-9B
-		db	AM_ACCU, AM_AIWX, AM_AIWX, AM_RELA	;9C-9F
+		db	AM_ACCU, AM_AIWX, AM_AIWX, AM_ODD3	;9C-9F
 ;
 		db	AM_IMME, AM_ZIIX, AM_IMME, AM_BADD	;A0-A3
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;A4-A7
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;A4-A7
 		db	AM_IMPL, AM_IMME, AM_IMPL, AM_BADD	;A8-AB
-		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_RELA	;AC-AF
+		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ODD3	;AC-AF
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;B0-B3
-		db	AM_ZIWX, AM_ZIWX, AM_ZIWY, AM_ZERO	;B4-B7
+		db	AM_ZIWX, AM_ZIWX, AM_ZIWY, AM_ODD2	;B4-B7
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_BADD	;B8-BB
-		db	AM_AIWX, AM_AIWX, AM_AIWY, AM_RELA	;BC-BF
+		db	AM_AIWX, AM_AIWX, AM_AIWY, AM_ODD3	;BC-BF
 ;
 		db	AM_IMME, AM_ZIIX, AM_BADD, AM_BADD	;C0-C3
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;C4-C7
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;C4-C7
 		db	AM_IMPL, AM_IMME, AM_IMPL, AM_IMPL	;C8-CB
-		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_RELA	;CC-CF
+		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ODD3	;CC-CF
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;D0-D3
-		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ZERO	;D4-D7
+		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ODD2	;D4-D7
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_IMPL	;D8-DB
-		db	AM_BADD, AM_AIWX, AM_AIWX, AM_RELA	;DC-DF
+		db	AM_BADD, AM_AIWX, AM_AIWX, AM_ODD3	;DC-DF
 ;
 		db	AM_IMME, AM_ZIIX, AM_BADD, AM_BADD	;E0-E3
-		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ZERO	;E4-E7
+		db	AM_ZERO, AM_ZERO, AM_ZERO, AM_ODD2	;E4-E7
 		db	AM_IMPL, AM_IMME, AM_IMPL, AM_BADD	;E8-EB
-		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_RELA	;EC-EF
+		db	AM_ABSO, AM_ABSO, AM_ABSO, AM_ODD3	;EC-EF
 ;
 		db	AM_RELA, AM_IIWY, AM_ZPIN, AM_BADD	;D0-D3
-		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ZERO	;D4-D7
+		db	AM_BADD, AM_ZIWX, AM_ZIWX, AM_ODD2	;D4-D7
 		db	AM_IMPL, AM_AIWY, AM_IMPL, AM_BADD	;D8-DB
-		db	AM_BADD, AM_AIWX, AM_AIWX, AM_RELA	;DC-DF
+		db	AM_BADD, AM_AIWX, AM_AIWX, AM_ODD3	;DC-DF
 ;
 ;=====================================================
 ; Using the opcode as an index, this returns the
