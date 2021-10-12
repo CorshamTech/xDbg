@@ -33,6 +33,7 @@ Step		ldy	#0
 		inc	ID		;do step-over
 stepnoto	lda	(PCL),y		;get opcode
 		tax			;just in case
+		sta	opcode		;save for later
 ;
 ; See if it is a JMP or JSR.
 ;
@@ -65,6 +66,7 @@ stepnoto	lda	(PCL),y		;get opcode
 		inc	INH
 stepaii1	ldy	#0
 		jmp	stepindir1
+;
 steptrybv	jmp	steptryb
 ;
 ; The next two bytes contain the address of where the
@@ -130,14 +132,15 @@ stepJMP2	ldy	#0
 ; instruction and if the condition is true, then
 ; compute the target address of the branch.
 ;
-steptryb	cmp	#$80		;BRA?
+steptryb	lda	opcode
+		cmp	#$80		;BRA?
 		beq	steptakebranch	;branch always taken
 		and	#$0f
 		bne	stepnobranch	;not a branch
 ;
 ; All other branches have bit 4 set.
 ;
-		lda	(PCL),y		;get opcode
+		lda	opcode
 		and	#%00010000	;all branches set
 		beq	stepnobranch	;not a branch
 ;
@@ -147,7 +150,7 @@ steptryb	cmp	#$80		;BRA?
 ; instruction this is.  BPL=000, BMI=001, BVC=010, BVS=011,
 ; BCC=100, BCS=101, BNE=110, BEQ=111
 ;
-		lda	(PCL),y
+		lda	opcode
 		lsr	a		;upper nibble...
 		lsr	a		;becomes index
 		lsr	a
@@ -165,14 +168,14 @@ steptryb	cmp	#$80		;BRA?
 ;
 ; If we get here, the flag bit is set.
 ;
-		lda	(PCL),y		;get back opcode
+		lda	opcode		;get back opcode
 		and	#%00100000
 		beq	stepnobranch	;branch if should be 0
 		jmp	steptakebranch
 ;
 ; If we get here, the flag bit is clear.
 ;
-stepflag0	lda	(PCL),y
+stepflag0	lda	opcode
 		and	#%00100000	;must be clear
 		bne	stepnobranch
 ;
@@ -212,7 +215,9 @@ pflagbits	db	$80,$80,$40,$40	;BMI,BPL,BVC,BVS
 ; Check for a BBSx or BBRx instruction.  the opcode is
 ; in A.
 ;
-stepnobranch	cmp	#$0f
+stepnobranch	lda	opcode
+		and	#$0f
+		cmp	#$0f
 		bne	stepnormal	;nope
 ;
 ; The lower 3 bits of the top nibble contain the bit
@@ -297,7 +302,8 @@ stepnbNo	lda	#3		;lenght of instruction
 ; instruction in series.  On entry, X contains
 ; the opcode.
 ;
-stepnormal	lda	addmodeTbl,x	;get addr mode
+stepnormal	ldx	opcode
+		lda	addmodeTbl,x	;get addr mode
 		tax
 		lda	addmodeLen,x	;get length
 ;
