@@ -464,7 +464,7 @@ asmfinipr	sty	ID		;a counter
 ;
 asmfiniloop	ldy	#0
 		lda	(POINTL),y
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		jsr	space
 		jsr	INCPT
 		dec	ID		;enough bytes?

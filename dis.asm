@@ -95,7 +95,7 @@ dodissem1	sta	addmode
 dodissem2	lda	(POINTL),y	;get byte
 		stx	storeX
 		sty	storeY
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		jsr	space
 		ldy	storeY
 		ldx	storeX
@@ -250,7 +250,7 @@ dishanImm	lda	#'#'
 		jsr	xkOUTCH
 		ldy	#1
 		lda	(POINTL),y
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	#3
 		jmp	disspacer
 ;
@@ -259,10 +259,10 @@ dishanImm	lda	#'#'
 ;
 dishanAbs	ldy	#2
 		lda	(POINTL),y
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		ldy	#1
 		lda	(POINTL),y
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	#4
 		jmp	disspacer
 ;
@@ -299,9 +299,9 @@ dishanpos	clc
 		sta	Temp16+1
 ;
 		lda	Temp16+1
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	Temp16
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 		lda	#4
 		jmp	disspacer
@@ -326,7 +326,7 @@ dishanODD3	lda	POINTL		;move to Temp16
 ;
 dishanODD1	ldy	#1		;get address
 		lda	(POINTL),y
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	#','
 		jsr	xkOUTCH
 ;
@@ -345,14 +345,14 @@ dishanODDpos	clc
 		sta	Temp16+1
 ;
 		lda	Temp16+1
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	Temp16
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 		lda	#7
 		jmp	disspacer
 ;
-dishanODD2
+dishanODD2				;just like zero page
 ;
 ;=====================================================
 ; Handles zero page
@@ -455,10 +455,10 @@ disprpaddr	lda	#'('
 ;
 dispraddr	ldy	#2
 		lda	(POINTL),y
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		ldy	#1
 		lda	(POINTL),y
-		jmp	PRTBYT
+		jmp	xkPRTBYT
 ;
 ;=====================================================
 ; This prints a "(" followed by the 8 bit address
@@ -472,7 +472,7 @@ disprpZaddr	lda	#'('
 ;
 disprZaddr	ldy	#1
 		lda	(POINTL),y
-		jmp	PRTBYT
+		jmp	xkPRTBYT
 ;
 ;=====================================================
 ; This takes the bottom five bits of Temp16, adds

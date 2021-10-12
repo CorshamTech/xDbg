@@ -1,16 +1,21 @@
-; Assemble with -x option
-
+; Assemble with as65 -x option
+;
+; This assembler uses different syntax than the xDebugger for the
+; SMB, CMB, BBR and BBS instructions.
+;
 	include	"xkim.inc"
 	code
 	org	$0200
-Test	lda	#0
-loop	inc	a
-	cmp	#2
-	bne	loop
+Test	ldx	#15
+loop	stz	0,x
+	dex
+	bpl	loop
 	nop
 	nop
-	stz	0
 	smb	0,0	;set bit zero
+	smb	1,1
+	smb	2,2
+	smb	3,3
 	bbs	0,0,Test
 
 	org	AutoRun

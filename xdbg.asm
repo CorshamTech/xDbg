@@ -105,15 +105,15 @@ COLD		jsr	putsil
 		db	CR,LF
 		db	"Running at address ",0
 		lda	#Debugger>>8
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	#Debugger&$ff
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		jsr	putsil
 		db	" to ",0
 		lda	#CODE_END>>8
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	#CODE_END&$ff
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		jsr	CRLF
 		jsr	CRLF
 ;
@@ -234,7 +234,7 @@ Commands	db	'?'
 ExitDbg		jsr	RestoreVecs	;undo our handlers
 		ldx	initialSP
 		txs
-		jmp	extKim		;return to xKIM
+		jmp	extKIM		;return to xKIM
 ;
 ;=====================================================
 ; Jump to addresss which is on the command line.  It
@@ -379,10 +379,10 @@ loadcheckauto	lda	AutoRun+1
 		db	"Auto-run address and PC set to ",0
 		lda	AutoRun+1
 		sta	PCH
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	AutoRun
 		sta	PCL
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 loadhexit	jmp	CRLF
 		jmp	MainLoop
 ;
@@ -586,29 +586,29 @@ regsetFlags	lda	Temp16
 DumpRegisters	jsr	putsil
 		db	"PC:",0
 		lda	PCH
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	PCL
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 		jsr	putsil
 		db	" A:",0
 		lda	ACC
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 		jsr	putsil
 		db	" X:",0
 		lda	XREG
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 		jsr	putsil
 		db	" Y:",0
 		lda	YREG
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 		jsr	putsil
 		db	" SP:",0
 		lda	SPUSER
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 ;
 ; Last is the condition register.  For this, print the
 ; actual flags.  Lower case for clear, upper for set.

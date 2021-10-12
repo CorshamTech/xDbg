@@ -91,10 +91,10 @@ breakshow2	lda	breakpoints,y
 		beq	breakskip	;not in use
 		lda	breakpoints+2,y	;MSB of address
 		sty	storeY
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		ldy	storeY		;get back index
 		lda	breakpoints+1,y	;LSB of address
-		jsr	PRTBYT
+		jsr	xkPRTBYT
 		lda	#' '
 		jsr	xkOUTCH
 		ldy	storeY
