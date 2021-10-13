@@ -383,7 +383,7 @@ loadcheckauto	lda	AutoRun+1
 		lda	AutoRun
 		sta	PCL
 		jsr	xkPRTBYT
-loadhexit	jmp	CRLF
+loadhexit	jsr	CRLF
 		jmp	MainLoop
 ;
 ; Load from the console
