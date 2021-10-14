@@ -91,6 +91,12 @@ BASE		equ	$c000
 HIGHEST		equ	$deff
 	endif
 ;
+; To avoid stepping on the user stack, the debugger
+; moves the stack lower on page 1.  This sets the
+; highest location.
+;
+STACK		equ	$0180
+;
 ;=====================================================
 ; The debugger
 ;
@@ -101,7 +107,7 @@ Debugger	jmp	COLD
 ;
 COLD		jsr	putsil
 		db	CR,LF,LF
-		db	"Corsham Tech 65C02 xDebugger v0.1"
+		db	"Corsham Tech 65C02 xDebugger v0.2"
 		db	CR,LF
 		db	"Running at address ",0
 		lda	#Debugger>>8
@@ -128,7 +134,7 @@ COLD		jsr	putsil
 ; All command handlers should eventually JMP back to here,
 ; as this also resets the stack pointer.
 ;
-MainLoop	ldx	initialSP
+MainLoop	ldx	#STACK&$ff
 		txs			;make stack sane
 		jsr	putsil
 		db	"DBG> ",0
@@ -818,7 +824,9 @@ checkStep	lda	StepActive
 		lda	StepOpcode
 		sta	(INL),y		;restore opcode
 ;
-defaultISR	jsr	BreakRemove	;remove breakpoints
+defaultISR	ldx	#STACK&$ff
+		txs			;switch to dbg stack
+		jsr	BreakRemove	;remove breakpoints
 		jsr	doDisPC		;disassemble, then...
 		jsr	DumpRegisters	;...display registers
 		jsr	CRLF

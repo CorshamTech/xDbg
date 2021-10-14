@@ -20,7 +20,10 @@
 ;     but must be Set or Reset in a specific zero
 ;     page address to take the branch.  The nstruction
 ;     is three bytes long.
-; (3) The easiest case, put the BRK at the next
+; (4) RTS where the next address is on the stack.
+; (5) RTI where the return address and flags are on
+;     the stack.
+; (6) The easiest case, put the BRK at the next
 ;     instruction after the current one.
 ;
 Step		ldy	#0
@@ -35,7 +38,7 @@ stepnoto	lda	(PCL),y		;get opcode
 		tax			;just in case
 		sta	opcode		;save for later
 ;
-; See if it is a JMP or JSR.
+; See if it is one of the few special cases.
 ;
 		cmp	#$20		;JSR abs
 		beq	stepJSR
@@ -43,6 +46,10 @@ stepnoto	lda	(PCL),y		;get opcode
 		beq	stepJMP
 		cmp	#$6c		;JMP (indirect)
 		beq	stepIndirection
+		cmp	#$60		;RTS
+		beq	stepRTS
+		cmp	#$40		;RTI
+		beq	stepRTI
 		cmp	#$7c		;JMP (absolute,X)
 		bne	steptrybv	;try branches
 ;
@@ -126,6 +133,28 @@ stepJMP2	ldy	#0
 		lda	INH
 		sta	StepAddress+1
 		jmp	ContinueNoBrk	;go!
+;
+; The address of the next instruction-1 is on the stack.
+; Well, 0100+SP+1 = LSB, 0100+SP+2 = MSB.
+;
+
+stepRTI					;for now
+stepRTS		ldx	SPUSER
+		inx
+		lda	$0100,x
+		sta	INL
+		inx
+		lda	$0100,x
+		sta	INH
+;
+; Add one since the 6502 saves the address of the last
+; byte of the JSR, not the first byte of the next
+; instruction.
+;
+		inc	INL
+		bne	stepJMP2
+		inc	INH
+		jmp	stepJMP2
 ;
 ;-----------------------------------------------------
 ; Now it gets complicated.  If this is a branch
