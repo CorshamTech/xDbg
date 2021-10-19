@@ -95,7 +95,8 @@ HIGHEST		equ	$deff
 ; moves the stack lower on page 1.  This sets the
 ; highest location.
 ;
-STACK		equ	$0180
+STACK		equ	$0100
+DBG_STACK	equ	STACK+$80
 ;
 ;=====================================================
 ; The debugger
@@ -134,7 +135,7 @@ COLD		jsr	putsil
 ; All command handlers should eventually JMP back to here,
 ; as this also resets the stack pointer.
 ;
-MainLoop	ldx	#STACK&$ff
+MainLoop	ldx	#DBG_STACK&$ff
 		txs			;make stack sane
 		jsr	putsil
 		db	"DBG> ",0
@@ -824,7 +825,7 @@ checkStep	lda	StepActive
 		lda	StepOpcode
 		sta	(INL),y		;restore opcode
 ;
-defaultISR	ldx	#STACK&$ff
+defaultISR	ldx	#DBG_STACK&$ff
 		txs			;switch to dbg stack
 		jsr	BreakRemove	;remove breakpoints
 		jsr	doDisPC		;disassemble, then...

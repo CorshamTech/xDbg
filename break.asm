@@ -128,8 +128,7 @@ breakcmd1	jsr	putsil
 ;-----------------------------------------------------
 ; Remove the breakpoint at a specific address
 ;
-breakclraddr	jsr	SkipSpaces2
-		jsr	ChkParam
+breakclraddr	jsr	ChkParam
 		jsr	GetHex		;get address to clear
 ;
 ; Search table for entry, set in-use flag to 0.
@@ -172,7 +171,7 @@ breakset2	lda	#$ff
 ; Given a breakpoint address in Temp16, find the entry
 ; in breakpoints.  If found, returns C set and Y has
 ; the offset to the start of the entry.  Else, return
-; with C set.  If Y is FF then there is no free entry,
+; with C clear.  If Y is FF then there is no free entry,
 ; else Y points to first free entry.  Uses storeY to
 ; keep track of first free entry.
 ;
@@ -187,7 +186,7 @@ breakfind2	lda	breakpoints,y
 		lda	breakpoints+2,y	;MSB
 		cmp	Temp16+1
 		bne	breakfind4
-		clc
+		sec
 		rts			;Found!
 ;
 ; Branch here if this is a free entry.  See if this is the

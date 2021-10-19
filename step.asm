@@ -137,7 +137,6 @@ stepJMP2	ldy	#0
 ; The address of the next instruction-1 is on the stack.
 ; Well, 0100+SP+1 = LSB, 0100+SP+2 = MSB.
 ;
-
 stepRTI					;for now
 stepRTS		ldx	SPUSER
 		inx
